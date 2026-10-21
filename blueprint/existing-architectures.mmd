@@ -1,0 +1,31 @@
+flowchart LR
+  subgraph LEGACY["Legacy dash-uploader"]
+    L_DASH["Dash app"]
+    L_FACTORY["Python Upload factory<br/>module-global config"]
+    L_UI["React + Flow.js"]
+    L_HTTP["Flask GET/POST handler"]
+    L_CHUNKS["Temporary chunk files<br/>lock files"]
+    L_FINAL["Final file path<br/>concatenation"]
+    L_PROPS["Dash component props"]
+    L_CB["Callback wrapper<br/>UploadStatus"]
+    L_DASH --> L_FACTORY --> L_UI
+    L_UI -- "chunk POSTs<br/>client values" --> L_HTTP
+    L_HTTP --> L_CHUNKS --> L_FINAL
+    L_FINAL -. "file stored" .-> L_PROPS
+    L_UI -- "success props" --> L_PROPS --> L_CB --> L_DASH
+  end
+
+  subgraph UPPY["dash-uploader-uppy5"]
+    U_DASH["Dash app"]
+    U_FACTORY["Python Upload factory<br/>Pydantic config"]
+    U_UI["React + Uppy Dashboard"]
+    U_XHR["XHRUpload<br/>multipart per file"]
+    U_HTTP["Flask POST handler"]
+    U_SAVE["Sanitized filename<br/>direct FileStorage.save"]
+    U_PROPS["uploadedFiles / failedFiles<br/>trigger status props"]
+    U_CB["Dash callback"]
+    U_DASH --> U_FACTORY --> U_UI
+    U_UI --> U_XHR -- "multipart POST" --> U_HTTP --> U_SAVE
+    U_SAVE -. "JSON filename response" .-> U_XHR
+    U_XHR --> U_PROPS --> U_CB --> U_DASH
+  end

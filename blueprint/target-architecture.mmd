@@ -1,0 +1,33 @@
+flowchart LR
+  User["User / browser"]
+  Dash["Dash application"]
+  Component["Dash uploader component<br/>Uppy or chosen UI"]
+  Auth["Host authentication<br/>and authorization policy"]
+  API["App-scoped upload API"]
+  Session["Durable upload-session metadata"]
+  Staging["Server-generated staging keys"]
+  Verify["Finalize / size / integrity / policy checks"]
+  Final["Final storage"]
+  Callback["Dash callback receives<br/>opaque file reference + safe metadata"]
+  Cleanup["Expiry and cleanup worker"]
+  Observability["Structured logs / metrics / audit events"]
+
+  User --> Component
+  Dash --> Component
+  Component -->|"create session"| API
+  API --> Auth
+  Auth -->|"allow / deny"| API
+  API <--> Session
+  Component -->|"transfer data"| API
+  API -->|"write bounded data"| Staging
+  Component -->|"finalize"| API
+  API --> Verify
+  Verify -->|"verified publish"| Final
+  Verify --> Session
+  Final --> Callback
+  Callback --> Dash
+  Cleanup --> Session
+  Cleanup --> Staging
+  API --> Observability
+  Verify --> Observability
+  Cleanup --> Observability
