@@ -1,0 +1,126 @@
+# Product and Technical Requirements
+
+## 1. Purpose
+
+Define an implementable first-release contract for a maintained Dash upload component. Requirements are written so they can be traced to architecture, tests, and release gates.
+
+### Requirement status
+
+- **MUST**: release-blocking requirement.
+- **SHOULD**: expected unless the project owner records an approved exception.
+- **TBD**: needs an owner decision before implementation; it is not a default or an implied promise.
+
+## 2. Users and actors
+
+- **Application developer:** installs the package, configures the app, and consumes callback results.
+- **End user:** selects, uploads, retries, or cancels files through the browser.
+- **Host application:** authenticates users and provides authorization policy.
+- **Operator:** configures storage, limits, reverse proxy, retention, monitoring, and deployment.
+- **Maintainer:** reviews changes, triages defects, releases supported versions, and handles security reports.
+
+## 3. Product scope
+
+### In scope
+
+- Dash component for selection, progress, and upload interaction.
+- Python configuration bound to an individual Dash app.
+- Server endpoint(s) for upload-session creation, transfer, completion, and cancellation as selected by the protocol ADR.
+- Server-side enforcement of configured limits and access policy.
+- Safe metadata and stable upload references for Dash callbacks.
+- Cleanup and operational observability for incomplete uploads.
+
+### Out of scope for the first release unless explicitly approved
+
+- Content transformation or media processing.
+- Built-in user identity provider.
+- Malware scanning service (integration hook may be required by the threat model).
+- Multiple storage providers.
+- Anonymous/public upload mode.
+- Compatibility with every undocumented legacy behavior.
+
+## 4. Functional requirements
+
+### Configuration and component
+
+- **FR-001 MUST:** Each Dash app has independent uploader configuration; configuration in one app cannot alter another app.
+- **FR-002 MUST:** The Python API validates component configuration and rejects unknown or invalid options clearly.
+- **FR-003 MUST:** The component supports a documented list of restrictions and clearly distinguishes browser feedback from server-enforced policy.
+- **FR-004 SHOULD:** The component communicates progress, retryable failure, terminal failure, cancellation, and completion accessibly.
+- **FR-005 MUST:** A component action result distinguishes command acceptance from asynchronous upload completion.
+- **FR-006 MUST:** A callback receives only a server-confirmed completion reference and documented safe metadata; it must not trust client-reported completion as authoritative.
+
+### Upload session and transfer
+
+- **FR-007 MUST:** Every upload has a server-tracked lifecycle and owner/authorization context.
+- **FR-008 MUST:** The server validates every create, transfer, finalize, cancel, status, and retry operation against the session state and policy.
+- **FR-009 MUST:** Upload data is written to server-generated staging keys; original names are metadata and are never path components.
+- **FR-010 MUST:** Configured file-size, file-count, request/chunk-size, per-session, per-user, and retention limits are enforced on the server. Exact default values are **TBD**.
+- **FR-011 MUST:** Duplicate and retry behavior is defined and idempotent where the client may retry.
+- **FR-012 MUST:** A file is reported as completed only after server-side completeness and policy checks and successful publication.
+- **FR-013 MUST:** Finalization does not expose partial data and has defined atomicity semantics for the chosen storage backend.
+- **FR-014 SHOULD:** The user can cancel an upload; cancellation prevents further transfer/finalization and schedules safe cleanup.
+- **FR-015 TBD:** Resumability across browser reloads, process restarts, or worker changes. Decide before selecting transport.
+
+### Authorization and integration
+
+- **FR-016 MUST:** The package provides a documented hook/integration for the host application to authorize upload creation and subsequent operations.
+- **FR-017 MUST:** Possession of a client-provided upload ID or file reference alone does not authorize access.
+- **FR-018 MUST:** The package supports proxy/base-path deployment as specified in the compatibility matrix.
+- **FR-019 MUST:** The package returns stable, documented error codes without exposing server internals.
+
+### Cleanup and audit
+
+- **FR-020 MUST:** Abandoned sessions expire after an operator-configured interval; default is **TBD**.
+- **FR-021 MUST:** Cleanup is scoped to the session’s staging data, safe to retry, and observable.
+- **FR-022 SHOULD:** The system emits auditable lifecycle events without recording file content, secrets, or unnecessary personal data.
+
+## 5. Non-functional requirements
+
+| ID | Requirement |
+|---|---|
+| **NFR-001 Security** | Threat-model controls in [`04-security-threat-model.md`](./04-security-threat-model.md) are release gates; security is not inferred from successful UI tests. |
+| **NFR-002 Memory** | The server must not buffer an entire configured maximum-size file in application memory. Verify with a bounded-memory integration test. |
+| **NFR-003 Scalability** | Supported worker/process topology and shared-state/storage requirements are documented and tested. |
+| **NFR-004 Reliability** | Retry, duplicate transfer, cancellation, interruption, and finalization semantics are deterministic and covered by tests. |
+| **NFR-005 Performance** | Define target file sizes, concurrency, network, storage, and latency before benchmarking. No performance claim is permitted without reproducible benchmark parameters. |
+| **NFR-006 Accessibility** | Keyboard operation, focus handling, labels, status announcements, and contrast are checked for the supported UI. |
+| **NFR-007 Compatibility** | Python, Dash, browser, Node, package manager, and storage support are explicitly declared; every declared runtime is exercised in CI or clearly marked as best-effort. |
+| **NFR-008 Observability** | Operators can distinguish validation, authorization, transport, storage, finalization, and cleanup failures using structured logs/metrics. |
+| **NFR-009 Privacy** | Retention, metadata collection, logging, and file deletion behavior are documented and configurable where required. |
+| **NFR-010 Maintainability** | Clean-checkout builds are reproducible; generated artifacts and lockfiles have documented source-of-truth rules. |
+
+## 6. User stories and acceptance examples
+
+1. As an application developer, I can configure two Dash apps independently, and each uses its own route, policy, and storage configuration.
+2. As an end user, I can see whether an upload was accepted, is progressing, completed, or failed without confusing command receipt with transfer completion.
+3. As an operator, I can set upload limits and verify that requests exceeding them are rejected by the server even when sent without the component UI.
+4. As a user, I cannot access another user’s upload by changing an upload ID or file reference.
+5. As an application, I receive a completed file reference only after the server has verified and published the file.
+6. As an operator, abandoned staging data is removed according to retention policy and cleanup failures are visible.
+
+## 7. Measurable acceptance criteria
+
+- Invalid path-like filenames and identifiers never change the resolved storage root or target an unintended location.
+- A configured maximum is enforced via direct endpoint requests as well as through the browser.
+- No unauthorized session can be read, written, finalized, cancelled, or deleted by another principal.
+- A file interrupted before finalize never appears as completed in Dash callback data.
+- Retrying the same permitted operation produces the documented result without duplicate publication or corruption.
+- Two app instances configured differently in one process pass isolation tests.
+- For the selected maximum file size, a load test demonstrates the agreed memory, storage, and throughput bounds. Numeric thresholds remain **TBD** until deployment assumptions are supplied.
+- The built wheel and source distribution install and pass import/smoke tests from clean environments.
+
+## 8. Decisions required before implementation
+
+The following values are intentionally not guessed:
+
+- package/repository name and publishing owner;
+- supported Python/Dash/browser versions;
+- maximum file size, chunk size, file count, concurrency, and per-user quota;
+- storage backend and shared-worker behavior;
+- upload transport and resumability requirements;
+- authentication/authorization integration contract;
+- retention/expiry and deletion policy;
+- content inspection/scanning requirements;
+- target deployment profile and reverse-proxy limits.
+
+Track decisions in [`07-decisions-risks-and-open-questions.md`](./07-decisions-risks-and-open-questions.md).
