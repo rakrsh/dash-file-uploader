@@ -109,6 +109,10 @@ Before the first public release, publish:
 - storage backends and consistency guarantees;
 - API stability and deprecation policy.
 
+The approved first-release support matrix is Python 3.11–3.14; Dash `>=3.0,<5.0`; Node.js 22 and 24 for component builds; and the latest two stable releases of Chrome, Edge, Firefox, and Safari. Internet Explorer is not supported. CI must exercise each supported Python version, the minimum Dash version and supported Dash major versions, both build Node.js versions, and the supported browser matrix before release.
+
+The intended distribution name is `dash-file-uploader` under the `rakrsh` publisher. Verify name availability and publisher ownership in the chosen package registry before the first publication.
+
 Only claim a version as supported if CI or a clearly described validation process covers it. Upgrade dependencies deliberately and run compatibility tests before changing lower/upper bounds.
 
 ## 7. Versioning and releases
