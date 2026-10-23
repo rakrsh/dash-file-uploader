@@ -2,28 +2,27 @@
 
 ## 1. Repository governance
 
-Before public development:
+Repository governance is recorded in the root `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, and `SUPPORT.md`, plus `.github/` issue forms, pull-request template, and `CODEOWNERS`.
 
-- identify maintainers and code owners;
-- protect the default branch and require reviewed pull requests;
-- provide issue, bug, feature, and security-reporting templates;
-- publish a contribution guide and code of conduct appropriate to the project;
-- define supported versions and end-of-support policy;
-- define who can publish packages and how credentials are protected;
-- document how security issues are handled privately before public disclosure.
+- **Maintainer and code owner:** `@rakrsh` is the sole maintainer and release owner. `@rakrsh` owns all files in `CODEOWNERS`. No backup maintainer is currently appointed.
+- **Publishing:** only `@rakrsh` may publish the intended `rakrsh` distribution. Require multi-factor authentication on the publishing account and prefer registry-supported trusted publishing/OIDC over long-lived credentials. Verify ownership and name availability before the first release.
+- **Security reporting:** use GitHub private vulnerability reporting; keep vulnerability handling private until a coordinated disclosure. Verify the GitHub feature is enabled in repository settings before the first public release. The response targets in `SECURITY.md` are goals, not an SLA.
+- **Support lifecycle:** use the release lifecycle in `SUPPORT.md` and the runtime matrix in section 6.
+- **Templates and contributions:** use the checked-in issue forms, PR template, contribution guide, and code of conduct.
+
+Repository settings and checked-in policies must agree. The current single-maintainer exception to independent PR approval is recorded in ADR-015 and must be revisited when a backup maintainer is appointed.
 
 Use issues or equivalent work tracking with links to requirements, threat scenarios, or ADRs. Changes to protocol, authorization, storage, dependencies, generated artifacts, or callback semantics require explicit review ownership.
 
 ## 2. Branch and pull-request workflow
 
-Recommended default:
+Current policy:
 
-- short-lived feature branches;
-- protected `main`;
-- small PRs with a clear objective and test evidence;
-- required CI checks and at least one qualified reviewer;
-- additional security review for authentication, authorization, path/storage handling, transport, and dependency changes;
-- release tags created only from reviewed commits.
+- use short-lived feature branches and submit all changes to `main` by pull request; direct pushes are disallowed;
+- require CI checks before merge as soon as the workflows from issue #7 are available;
+- while `@rakrsh` is the sole maintainer, do not require an independent approving review, which would make normal changes unmergeable; obtain maintainer review where practicable and revisit this exception when a second maintainer is added;
+- require additional security review for authentication, authorization, path/storage handling, transport, and dependency changes;
+- create release tags only from reviewed commits.
 
 PR description checklist:
 
@@ -43,6 +42,15 @@ Choose and document one toolchain for each ecosystem:
 - TypeScript/React and generated Dash component workflow.
 
 Do not maintain multiple competing lockfiles unless CI verifies they represent the same dependency resolution. Decide whether generated Dash bindings and bundles are committed or generated during packaging; test that policy from a clean clone.
+
+### Approved toolchain baseline
+
+- **Python:** `uv` with `pyproject.toml` and one committed `uv.lock`; Hatchling builds the package. Use Ruff for linting/formatting, mypy for static typing, and pytest for tests.
+- **Frontend:** Node.js 22 and 24 for builds; pnpm 10 with one committed `pnpm-lock.yaml`; TypeScript/React source with ESLint, Prettier, and Vitest.
+- **Browser testing:** Playwright for end-to-end tests in the supported browser matrix.
+- **Generated artifacts:** TypeScript/React is the source of truth. Commit generated Dash Python bindings and JS/CSS bundles; CI rebuilds them and fails if generated files drift. Published artifacts include the bundle so consumers do not need Node.js at runtime.
+
+The repository bootstrap should expose one documented command per task, implemented as package scripts or `uv run` commands. Initial command names are `uv sync --locked`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest`, `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, and `uv build`. CI must exercise Python 3.11–3.14 and Node.js 22/24, verify generated artifacts are reproducible, build wheel and sdist, and install/smoke-test both in clean environments. These commands become executable as the project scaffold is established.
 
 Provide one documented command per major task, for example:
 
@@ -146,6 +154,8 @@ The repository should maintain:
 - troubleshooting and stable error codes;
 - migration guide from both reference packages if compatibility is intended;
 - changelog, contribution guide, support policy, and security contact.
+
+The root governance files and GitHub templates are the source of truth for contributor conduct, vulnerability reporting, issue intake, and support lifecycle.
 
 ## 9. Operations and incident response
 

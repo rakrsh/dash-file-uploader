@@ -51,6 +51,27 @@ The first release targets internal and customer-facing Dash applications whose u
 - **FR-005 MUST:** A component action result distinguishes command acceptance from asynchronous upload completion.
 - **FR-006 MUST:** A callback receives only a server-confirmed completion reference and documented safe metadata; it must not trust client-reported completion as authoritative.
 
+### First-release component contract
+
+Inputs:
+
+- `id`: required Dash component identifier.
+- `disabled`: disables file selection and upload actions.
+- `maxFileSize`: positive maximum size in bytes for browser feedback.
+- `maxFiles`: positive file-count restriction for browser feedback.
+- `acceptedFileTypes`: list of extensions or MIME types using the browser `accept` convention.
+
+The three file restrictions are user-experience hints only. The server independently enforces the approved application policy. Authentication, storage credentials, server paths, and authorization decisions are never component props.
+
+Outputs:
+
+- `uploadEvents`: emits a per-file transition with `eventId`, `batchId`, `fileId`, and `status` (`accepted`, `uploading`, `completed`, `failed`, or `cancelled`). `accepted` means the server accepted and authorized the session, not merely that the browser received a command. A failed event includes a stable error `code`, safe `message`, and `retryable` flag.
+- `completedFiles`: cumulative per-file records containing only a server-confirmed opaque `uploadRef`, `batchId`, `filename`, `size`, and `mediaType`. A reference is not a bearer credential and grants no access by itself.
+
+Progress is rendered by the component and does not trigger a Dash callback for every progress update. Files in a batch have independent outcomes; successful files remain available when another file fails. A batch is terminal when every file is completed, failed, or cancelled. Per-file events preserve transition order, but no ordering is promised between different files. Errors never expose paths, stack traces, secrets, or storage details.
+
+The initial public error-code catalog is `INVALID_REQUEST`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `LIMIT_EXCEEDED`, `INVALID_STATE`, `UPLOAD_EXPIRED`, `UPLOAD_CANCELLED`, `INTEGRITY_FAILED`, `STORAGE_UNAVAILABLE`, `TRANSFER_FAILED`, and `INTERNAL_ERROR`. Codes and meanings are stable public API; messages may be clarified without changing codes.
+
 ### Upload session and transfer
 
 - **FR-007 MUST:** Every upload has a server-tracked lifecycle and owner/authorization context.

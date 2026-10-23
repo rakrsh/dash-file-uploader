@@ -20,8 +20,9 @@ The first-release storage profile is shared private object storage for upload da
 ### Dash application and component
 
 - The Python package registers an app-scoped extension/configuration object.
-- The component displays file selection, restrictions, progress, and state.
-- The component sends user actions to the upload API and reports server-confirmed completion references to Dash.
+- The Uppy Dashboard displays file selection, restrictions, progress, and per-file state.
+- The component exposes `uploadEvents` for per-file state transitions and `completedFiles` for server-confirmed results.
+- Transfer progress stays in the UI instead of generating a Dash callback for every progress update.
 - The component does not decide authorization or final file paths.
 - Component props are treated as client-controlled input when they return to the server.
 
@@ -99,7 +100,7 @@ The standalone Mermaid source is in [`target-architecture.mmd`](./target-archite
 flowchart LR
   User["User / browser"]
   Dash["Dash application"]
-  Component["Dash uploader component<br/>Uppy or chosen UI"]
+  Component["Dash uploader component<br/>Uppy Dashboard"]
   Auth["Host authentication<br/>and authorization policy"]
   API["App-scoped upload API"]
   Session["Durable database-backed<br/>upload-session metadata"]
