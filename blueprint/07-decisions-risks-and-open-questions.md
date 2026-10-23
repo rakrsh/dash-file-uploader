@@ -56,17 +56,19 @@ This is an initial decision register. “Proposed” is not approval. The projec
 
 ### ADR-007 — Dash completion contract
 
-- **Status:** Proposed.
-- **Decision:** Distinguish action receipt from eventual upload result. Callback payload contains an opaque server-confirmed file reference and safe metadata, not a trusted path or client-asserted completion.
-- **Reason:** The Uppy5 project has trigger/status props and documents receipt-versus-outcome semantics; preserving that distinction avoids ambiguous callbacks.
-- **Consequence:** Define event ordering, batch semantics, and whether callbacks fire per file or per batch.
+- **Status:** Accepted 2026-10-23.
+- **Owner:** Project owner (`rakrsh`).
+- **Decision:** Expose `id`, `disabled`, `maxFileSize`, `maxFiles`, and `acceptedFileTypes` as component inputs; restrictions are browser feedback only. `uploadEvents` reports per-file `accepted`, `uploading`, and terminal `completed`/`failed`/`cancelled` transitions. `completedFiles` is cumulative and contains only server-confirmed opaque references plus safe metadata. Progress stays in the UI. Batches allow partial success and end when every file is terminal.
+- **Reason:** Separating command/session acceptance from server-confirmed completion prevents callbacks from treating client claims as authoritative. Per-file outcomes support partial success without hiding successful files.
+- **Consequences:** Acceptance means the server authorized and created the session. Events include stable correlation IDs; per-file order is guaranteed but cross-file order is not. Errors use stable public codes with safe messages and a retryable flag. References do not grant access by possession and never expose filesystem paths.
 
 ### ADR-008 — UI toolkit
 
-- **Status:** Open.
-- **Options:** Uppy Dashboard; smaller custom component; native Dash upload components plus server API.
-- **Decision criteria:** accessibility, customization, package size, supported React/Dash versions, plugin support, and maintenance capacity.
-- **Proposed direction:** reuse Uppy if its UX meets requirements, but keep protocol and authorization independent from Uppy. Avoid presenting Uppy restrictions as server security controls.
+- **Status:** Accepted 2026-10-23.
+- **Owner:** Project owner (`rakrsh`).
+- **Decision:** Use Uppy Dashboard for the first-release UI. Keep transport behind an adapter so the component choice does not decide the upload protocol.
+- **Reason:** Uppy provides an established file-selection and progress experience while allowing the transport to be selected independently.
+- **Consequences:** Validate keyboard operation, focus handling, labels, announcements, contrast, supported browsers, and bundle size. Client restrictions remain advisory; server policy is authoritative.
 
 ### ADR-009 — Supported runtime matrix
 
@@ -78,9 +80,11 @@ This is an initial decision register. “Proposed” is not approval. The projec
 
 ### ADR-010 — Build artifacts and locks
 
-- **Status:** Proposed.
-- **Decision:** Commit one lockfile per package ecosystem and define one source of truth for generated Dash bindings/bundles. CI must build and install from a clean checkout.
-- **Consequence:** Document generated-file policy and verify built package contents before publishing.
+- **Status:** Accepted 2026-10-23.
+- **Owner:** Project owner (`rakrsh`).
+- **Decision:** Use `uv` with `pyproject.toml`/`uv.lock` and Hatchling for Python; Node.js 22/24 with pnpm 10/`pnpm-lock.yaml` for TypeScript/React builds. Use Ruff, mypy, pytest, ESLint, Prettier, Vitest, and Playwright. TypeScript/React is authoritative; commit generated Dash Python bindings and JS/CSS bundles.
+- **Reason:** One locked manager per ecosystem and a checked-in, reproducible component build make clean installs and package releases auditable.
+- **Consequences:** CI regenerates artifacts and fails on drift, tests supported runtime matrices, builds wheel/sdist, and smoke-tests clean installs. End users do not need Node.js to install or run published artifacts. Tool versions must be pinned in project metadata and CI.
 
 ### ADR-011 — Browser origin and CSRF policy
 
@@ -114,6 +118,14 @@ This is an initial decision register. “Proposed” is not approval. The projec
 - **Reason:** The new project has a security and maintenance contract that should not inherit undocumented legacy behavior by default.
 - **Consequences:** The package name remains subject to registry availability. Any compatibility adapter requires explicit review and must not weaken the security contract.
 
+### ADR-015 — Sole-maintainer governance baseline
+
+- **Status:** Accepted 2026-10-23.
+- **Owner:** Project owner (`rakrsh`).
+- **Decision:** `@rakrsh` is the sole maintainer, code owner, and release owner; no backup maintainer is currently appointed. Require pull requests to `main`, but do not require an approving review until another maintainer is available. Require CI before merge once issue #7 establishes the workflows. Use GitHub private vulnerability reporting, the Contributor Covenant 2.1, and the support lifecycle published in `SUPPORT.md`.
+- **Reason:** The repository needs accountable ownership and safe contribution/reporting paths now, without making all changes unmergeable while there is only one maintainer.
+- **Consequences:** The absence of a backup is a continuity risk. The no-approval exception is temporary and must be revisited when a second maintainer is appointed. Branch protection cannot require CI until the CI check names exist; issue #7 remains a dependency for that control.
+
 ## 3. Risk register
 
 | ID | Risk | Likelihood / impact | Mitigation / owner action |
@@ -125,7 +137,7 @@ This is an initial decision register. “Proposed” is not approval. The projec
 | **R-05** | A custom resumable protocol introduces race/corruption bugs. | Medium / High | Prefer a mature protocol where suitable; if custom, write protocol spec and adversarial/concurrency tests first. |
 | **R-06** | Multi-worker deployment loses session state or cannot access staging data. | Medium / High | Choose durable shared state/storage or limit support explicitly; test the declared topology. |
 | **R-07** | Legacy compatibility pressures weaken the new security contract. | Medium / High | Keep compatibility adapter optional and fail closed; provide a migration guide instead of insecure implicit behavior. |
-| **R-08** | New project lacks maintainers for ongoing dependencies and security response. | Medium / High | Confirm owner, security contact, release cadence, and support policy before launch. |
+| **R-08** | New project lacks a backup maintainer for ongoing dependencies and security response. | Medium / High | `@rakrsh` is the sole maintainer; private reporting and support policies are documented. Appoint a backup before stable production launch and revisit the PR approval rule. |
 | **R-09** | Generated artifacts or dependencies make releases non-reproducible. | Medium / Medium | Lock dependencies; clean-build/package tests in CI; verify artifact contents. |
 | **R-10** | Test suite covers only happy-path UI flows. | Medium / High | Make protocol, security, failure, concurrency, and packaging tests required gates. |
 | **R-11** | Performance claims do not match production topology. | Medium / Medium | Publish reproducible benchmark parameters and measured envelope; avoid unqualified “unlimited” claims. |
@@ -138,8 +150,7 @@ These should be answered before finalizing the implementation plan:
 2. Are additional storage profiles required beyond the first-release private shared object-storage profile? Multiple providers are out of scope unless explicitly approved.
 3. What identity/authorization API can the host app provide?
 4. Which deployments require the host scanning/quarantine hook, and what backup policy applies?
-5. Is a rich Uppy Dashboard required, or can a lighter/native UI meet the product goal?
-6. Who will be the backup maintainer and security contact beyond the project owner?
+5. Who can serve as backup maintainer? Currently none is appointed; resolve before stable production launch.
 
 ## 5. Decision review cadence
 
