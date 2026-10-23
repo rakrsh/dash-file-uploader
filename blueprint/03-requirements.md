@@ -18,6 +18,8 @@ Define an implementable first-release contract for a maintained Dash upload comp
 - **Operator:** configures storage, limits, reverse proxy, retention, monitoring, and deployment.
 - **Maintainer:** reviews changes, triages defects, releases supported versions, and handles security reports.
 
+The first release targets internal and customer-facing Dash applications whose users are authenticated by the host application. Anonymous/public uploads are excluded.
+
 ## 3. Product scope
 
 ### In scope
@@ -36,7 +38,7 @@ Define an implementable first-release contract for a maintained Dash upload comp
 - Malware scanning service (integration hook may be required by the threat model).
 - Multiple storage providers.
 - Anonymous/public upload mode.
-- Compatibility with every undocumented legacy behavior.
+- Broad compatibility with either predecessor package or its undocumented legacy behavior. The first release uses a clean API and provides migration guidance.
 
 ## 4. Functional requirements
 
@@ -54,12 +56,12 @@ Define an implementable first-release contract for a maintained Dash upload comp
 - **FR-007 MUST:** Every upload has a server-tracked lifecycle and owner/authorization context.
 - **FR-008 MUST:** The server validates every create, transfer, finalize, cancel, status, and retry operation against the session state and policy.
 - **FR-009 MUST:** Upload data is written to server-generated staging keys; original names are metadata and are never path components.
-- **FR-010 MUST:** Configured file-size, file-count, request/chunk-size, per-session, per-user, and retention limits are enforced on the server. Exact default values are **TBD**.
+- **FR-010 MUST:** The server enforces these first-release limits: 5 GiB per file; 64 MiB per request or chunk; 10 files and 10 GiB aggregate per batch; 3 concurrent transfers per user; and 10 GiB of active staging data per user. The host application enforces quotas for completed objects.
 - **FR-011 MUST:** Duplicate and retry behavior is defined and idempotent where the client may retry.
 - **FR-012 MUST:** A file is reported as completed only after server-side completeness and policy checks and successful publication.
 - **FR-013 MUST:** Finalization does not expose partial data and has defined atomicity semantics for the chosen storage backend.
 - **FR-014 SHOULD:** The user can cancel an upload; cancellation prevents further transfer/finalization and schedules safe cleanup.
-- **FR-015 TBD:** Resumability across browser reloads, process restarts, or worker changes. Decide before selecting transport.
+- **FR-015 MUST:** Uploads resume after network interruption, browser reload, application/process restart, and requests reaching a different worker. The selected transport and durable shared state/storage must implement and verify these guarantees.
 
 ### Authorization and integration
 
@@ -70,7 +72,7 @@ Define an implementable first-release contract for a maintained Dash upload comp
 
 ### Cleanup and audit
 
-- **FR-020 MUST:** Abandoned sessions expire after an operator-configured interval; default is **TBD**.
+- **FR-020 MUST:** Incomplete sessions expire after 24 hours without activity and no later than 7 days after creation. Cleanup is retryable. Completed objects are retained or deleted by the host application, not automatically by the uploader.
 - **FR-021 MUST:** Cleanup is scoped to the session’s staging data, safe to retry, and observable.
 - **FR-022 SHOULD:** The system emits auditable lifecycle events without recording file content, secrets, or unnecessary personal data.
 
@@ -84,7 +86,7 @@ Define an implementable first-release contract for a maintained Dash upload comp
 | **NFR-004 Reliability** | Retry, duplicate transfer, cancellation, interruption, and finalization semantics are deterministic and covered by tests. |
 | **NFR-005 Performance** | Define target file sizes, concurrency, network, storage, and latency before benchmarking. No performance claim is permitted without reproducible benchmark parameters. |
 | **NFR-006 Accessibility** | Keyboard operation, focus handling, labels, status announcements, and contrast are checked for the supported UI. |
-| **NFR-007 Compatibility** | Python, Dash, browser, Node, package manager, and storage support are explicitly declared; every declared runtime is exercised in CI or clearly marked as best-effort. |
+| **NFR-007 Compatibility** | Support Python 3.11–3.14; Dash `>=3.0,<5.0`; Node.js 22 and 24 for component builds; and the latest two stable releases of Chrome, Edge, Firefox, and Safari. No Internet Explorer support. CI exercises declared runtimes or clearly marks best-effort coverage. |
 | **NFR-008 Observability** | Operators can distinguish validation, authorization, transport, storage, finalization, and cleanup failures using structured logs/metrics. |
 | **NFR-009 Privacy** | Retention, metadata collection, logging, and file deletion behavior are documented and configurable where required. |
 | **NFR-010 Maintainability** | Clean-checkout builds are reproducible; generated artifacts and lockfiles have documented source-of-truth rules. |
@@ -111,16 +113,14 @@ Define an implementable first-release contract for a maintained Dash upload comp
 
 ## 8. Decisions required before implementation
 
-The following values are intentionally not guessed:
+The following decisions remain open:
 
-- package/repository name and publishing owner;
-- supported Python/Dash/browser versions;
-- maximum file size, chunk size, file count, concurrency, and per-user quota;
-- storage backend and shared-worker behavior;
-- upload transport and resumability requirements;
-- authentication/authorization integration contract;
-- retention/expiry and deletion policy;
-- content inspection/scanning requirements;
-- target deployment profile and reverse-proxy limits.
+- concrete object-storage provider and database engine;
+- upload transport/protocol implementation for the accepted resume requirement;
+- host authentication/authorization API integration details;
+- whether host-provided scanning/quarantine is mandatory for each deployment and the applicable backup policy;
+- concrete reverse-proxy configuration for the selected deployment.
+
+The intended package name is `dash-file-uploader` under `rakrsh`; verify name availability in the package registry before first publication. No broad compatibility with predecessor packages is promised; provide migration guidance for documented behavior.
 
 Track decisions in [`07-decisions-risks-and-open-questions.md`](./07-decisions-risks-and-open-questions.md).
