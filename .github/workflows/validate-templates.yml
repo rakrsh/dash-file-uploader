@@ -1,0 +1,66 @@
+name: Validate project templates and tools
+
+on:
+  push:
+    paths:
+      - '.github/**'
+      - '.agent/**'
+      - '.claude/**'
+      - '.vscode/mcp.json'
+      - 'mcp/**'
+      - 'package.json'
+  pull_request:
+    paths:
+      - '.github/**'
+      - '.agent/**'
+      - '.claude/**'
+      - '.vscode/mcp.json'
+      - 'mcp/**'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ vars.NODE_VERSION }}
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ vars.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install validation dependencies
+        run: uv sync --group dev
+
+      - name: Check template files
+        run: |
+          test -f .github/ISSUE_TEMPLATE/bug_report.md
+          test -f .github/ISSUE_TEMPLATE/issue_template.md
+          test -f .github/ISSUE_TEMPLATE/story.md
+          test -f .github/pull_request_template.md
+          test -f .github/copilot-instructions.md
+          test -f .github/AI_CONTEXT.md
+          test -f .claude/CLAUDE.md
+
+      - name: Parse workflow and skill frontmatter
+        run: |
+          uv run python -c "from pathlib import Path; import yaml; [yaml.safe_load(p.read_text()) for p in Path('.github/workflows').glob('*.yml')]; [yaml.safe_load(p.read_text().split('---', 2)[1]) for p in Path('.agent/skills').glob('*/SKILL.md')]"
+
+      - name: Check MCP JavaScript syntax
+        run: |
+          node --check mcp/dash-build-validator.js
+          node --check mcp/echarts-option-inspector.js
+          node --check mcp/lib/stdio-rpc.js

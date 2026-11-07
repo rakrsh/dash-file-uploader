@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dash-file-uploader"
+version = "0.0.0"
+description = "Secure chunked file upload component for Plotly Dash."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11,<3.15"
+dependencies = ["dash>=3.0,<5.0"]
+classifiers = [
+  "Framework :: Dash",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+
+[dependency-groups]
+dev = [
+  "mypy>=1.13",
+  "pip-audit>=2.7",
+  "pytest>=8.3",
+  "ruff>=0.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["dash_file_uploader"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/dash_file_uploader",
+  "/tests",
+  "/README.md",
+  "/LICENSE",
+  "/pyproject.toml",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["dash_file_uploader/FileUploader.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"scripts/**" = ["S101", "S603", "S607"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["dash_file_uploader", "scripts", "tests"]
+exclude = ["dash_file_uploader/FileUploader\\.py"]
+
+[[tool.mypy.overrides]]
+module = ["dash.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

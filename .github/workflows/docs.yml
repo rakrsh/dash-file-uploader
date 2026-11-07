@@ -1,0 +1,110 @@
+name: Documentation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  release:
+    types: [published]
+  pull_request:
+    branches: [main]
+    paths:
+      - "README.md"
+      - "MIGRATION.md"
+      - "examples/**"
+      - "docs/**"
+      - "dash_echartsx/**"
+      - "src/lib/components/**"
+      - "scripts/generate_docs_reference.py"
+      - "scripts/build_versioned_docs.py"
+      - "package.json"
+      - "package-lock.json"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docs.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure the development ref is available
+        run: |
+          if ! git show-ref --verify --quiet refs/heads/main; then
+            git branch main origin/main
+          fi
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ vars.NODE_VERSION }}
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ vars.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          uv sync --group dev --group docs
+
+      - name: Build and validate documentation
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            npm run docs:build:single
+          else
+            npm run docs:build
+          fi
+
+      - name: Verify generated API references are committed
+        run: git diff --exit-code -- dash_echartsx/metadata.json dash_echartsx/DashEChartsX.py dash_echartsx/DashEChartsX.pyi docs/reference/typescript_props.rst
+
+      - name: Upload versioned documentation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: versioned-docs
+          path: docs/_build/html
+
+  deploy:
+    if: >-
+      (github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' ||
+          (startsWith(github.ref, 'refs/tags/v') &&
+            !contains(github.ref, '-')))) ||
+      (github.event_name == 'release' &&
+        !github.event.release.prerelease)
+    concurrency:
+      group: gh-pages-docs-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download versioned documentation
+        uses: actions/download-artifact@v4
+        with:
+          name: versioned-docs
+          path: docs/_build/html
+
+      - name: Deploy documentation to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: docs/_build/html
+          force_orphan: true
