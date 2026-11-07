@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  release:
+    types: [published, prereleased]
+
+jobs:
+  publish:
+    if: >-
+      startsWith(github.event.release.tag_name, 'v') &&
+      !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify release commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Release commit $GITHUB_SHA is not on main."
+            exit 1
+          fi
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ vars.NODE_VERSION || '20' }}
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ vars.PYTHON_VERSION || '3.12' }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ vars.UV_VERSION || 'latest' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          uv sync --group dev
+
+      - name: Build component and generated API
+        run: npm run build
+
+      - name: Verify generated files are committed
+        run: git diff --exit-code -- dash_echartsx
+
+      - name: Run release quality gates
+        run: |
+          npm test
+          npm run lint
+          npm run typecheck
+          uv run ruff check .
+          uv run black --check dash_echartsx tests scripts
+          uv run pytest
+
+      - name: Verify release tag and package versions
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: uv run python scripts/check_release_metadata.py "$RELEASE_TAG"
+
+      - name: Build Python distributions
+        run: uv build
+
+      - name: Verify clean-environment wheel installation
+        run: |
+          uv venv .venv-check
+          uv pip install --python .venv-check/bin/python dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$GITHUB_WORKSPACE/.venv-check/bin/python" "$GITHUB_WORKSPACE/scripts/check_installed_package.py"
+
+      - name: Upload distributions to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
