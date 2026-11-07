@@ -53,7 +53,7 @@ select = ["E", "F", "I", "B", "UP", "S"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["dash_file_uploader", "scripts", "tests"]
+files = ["dash_file_uploader", "tests"]
 exclude = ["dash_file_uploader/FileUploader\\.py"]
 
 [[tool.mypy.overrides]]

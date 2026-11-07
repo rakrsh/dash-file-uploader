@@ -23,7 +23,16 @@ Changes to authorization, upload protocol, storage, limits, dependency policy, g
 
 ## Development checks
 
-The approved toolchain is documented in [the SDLC and release plan](../blueprint/06-sdlc-quality-and-release.md). The repository bootstrap and executable check commands are being established; do not report a check as passing unless it was actually run.
+The approved toolchain is documented in [the SDLC and release plan](../blueprint/06-sdlc-quality-and-release.md). Run these Python checks before submitting a change; do not report a check as passing unless it was actually run:
+
+```powershell
+uv sync --locked --group dev
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+uv run pytest
+uv build
+```
 
 ## Generated artifacts
 
