@@ -11,21 +11,13 @@ permissions:
 
 jobs:
   quality:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        echarts-version: ["5.6.0", "6.1.0"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ vars.NODE_VERSION }}
-          cache: npm
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,119 +30,34 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: |
-          npm ci
-          npm install --no-save --package-lock=false echarts@${{ matrix.echarts-version }}
-          uv sync --group dev
-
-      - name: Build Dash component and bundles
-        run: npm run build
-
-      - name: Frontend checks
-        run: |
-          npm test
-          npm run lint
-          npm run typecheck
+        run: uv sync --locked --group dev
 
       - name: Python checks
         run: |
           uv run ruff check .
-          uv run black --check dash_echartsx tests scripts
+          uv run ruff format --check .
+          uv run mypy
           uv run pytest
 
   distributions:
-    name: Build distributions (${{ matrix.os }}, Python ${{ matrix.python-version }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    needs: quality
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
 
       - name: Build wheel and source distribution
         run: uv build
 
       - name: Install the built wheel
-        run: python -c "from pathlib import Path; import subprocess; wheel=next(Path('dist').glob('*.whl')); subprocess.check_call(['uv', 'pip', 'install', '--system', str(wheel)])"
+        run: uv pip install --system dist/*.whl
 
       - name: Verify installed package
-        run: python -c "import os; os.chdir(os.environ['RUNNER_TEMP']); import dash_echartsx; print(dash_echartsx.__version__)"
-
-      - name: Upload pull request distribution artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dash-file-uploader-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: dist/*
-          if-no-files-found: error
-          retention-days: 30
-
-  firefox-integration:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ vars.NODE_VERSION }}
-          cache: npm
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ vars.PYTHON_VERSION }}
-
-      - name: Set up Firefox
-        uses: browser-actions/setup-firefox@v1
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Install dependencies
-        run: |
-          npm ci
-          uv sync --group dev
-
-      - name: Build Dash component and bundles
-        run: npm run build
-
-      - name: Run headless Firefox integration tests
-        env:
-          CI: "true"
-        run: uv run pytest -m "integration and not webgl" --webdriver Firefox
-
-  trunk-gate:
-    name: trunk-gate
-    if: always()
-    needs:
-      - quality
-      - distributions
-      - firefox-integration
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require all CI jobs to pass
-        env:
-          QUALITY_RESULT: ${{ needs.quality.result }}
-          DISTRIBUTIONS_RESULT: ${{ needs.distributions.result }}
-          FIREFOX_RESULT: ${{ needs.firefox-integration.result }}
-        run: |
-          if [[ "$QUALITY_RESULT" != "success" ||
-                "$DISTRIBUTIONS_RESULT" != "success" ||
-                "$FIREFOX_RESULT" != "success" ]]; then
-            echo "CI failed: quality=$QUALITY_RESULT, distributions=$DISTRIBUTIONS_RESULT, firefox=$FIREFOX_RESULT"
-            exit 1
-          fi
+        run: python -c "import os, tempfile; os.chdir(tempfile.gettempdir()); import dash_file_uploader; print(dash_file_uploader.__version__)"
